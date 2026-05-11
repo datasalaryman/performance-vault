@@ -2,12 +2,13 @@ use quasar_lang::prelude::*;
 use super::deposit::VaultPda;
 
 #[derive(Accounts)]
+#[instruction(vault_bump: u8)]
 pub struct Withdraw {
     #[account(mut)]
     pub user: Signer,
     #[account(
         mut, 
-        address = VaultPda::seeds(user.address())
+        address = VaultPda::seeds(user.address()).with_bump(vault_bump)
     )]
     pub vault: UncheckedAccount,
     pub system_program: Program<SystemProgram>,
@@ -16,16 +17,17 @@ pub struct Withdraw {
 
 impl Withdraw {
     #[inline(always)]
-    pub fn withdraw(&self) -> Result<(), ProgramError> {
-        let seeds = [
-            Seed::from(b"vault" as &[u8]), 
-            Seed::from(self.user.address().as_ref()), 
-        ];
-
+    pub fn withdraw(&self, vault_bump: u8) -> Result<(), ProgramError> {
         let amount = self.vault.to_account_view().lamports();
-        
-        self.system_program
-            .transfer(&self.vault, &self.user, amount)
-            .invoke_signed(&seeds)
+
+        quasar_lang::address::AddressVerify::with_signer_seeds(
+            &VaultPda::seeds(self.user.address()).with_bump(vault_bump),
+            &[],
+            |signers| {
+                self.system_program
+                    .transfer(&self.vault, &self.user, amount)
+                    .invoke_with_signers(signers)
+            },
+        )
     }
 }

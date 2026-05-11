@@ -13,16 +13,12 @@ mod performance_vault {
 
     #[instruction(discriminator = 0)]
     pub fn deposit(ctx: Ctx<Deposit>, amount: u64) -> Result<(), ProgramError> {
-        // deposit logic
-        ctx.accounts.deposit(amount);
-        Ok(())
+        ctx.accounts.deposit(amount)
     }
 
     #[instruction(discriminator = 1)]
-    pub fn withdraw(ctx: Ctx<Withdraw>) -> Result<(), ProgramError> {
-        // withdraw logic
-        ctx.accounts.withdraw();
-        Ok(())
+    pub fn withdraw(ctx: Ctx<Withdraw>, vault_bump: u8) -> Result<(), ProgramError> {
+        ctx.accounts.withdraw(vault_bump)
     }
 }
 

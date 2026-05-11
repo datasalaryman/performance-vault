@@ -14,7 +14,7 @@ fn deposit_instruction (
     amount: u64
 ) -> Instruction {
 
-    let (vault, _) = Pubkey::find_program_address(&[b"vault", user.as_ref()], &crate::ID);
+    let (vault, vault_bump) = Pubkey::find_program_address(&[b"vault", user.as_ref()], &crate::ID);
 
     Instruction { 
         program_id: crate::ID, 
@@ -23,7 +23,7 @@ fn deposit_instruction (
             AccountMeta::new(vault, true),
             AccountMeta::new_readonly(system_program(), false),
         ], 
-        data: [vec![0], amount.to_le_bytes().to_vec()].concat()
+        data: [vec![0], amount.to_le_bytes().to_vec(), vec![vault_bump]].concat()
     }
 }
 
@@ -31,16 +31,16 @@ fn withdraw_instruction (
     user: Address, 
 ) -> Instruction {
 
-    let (vault, _) = Pubkey::find_program_address(&[b"vault", user.as_ref()], &crate::ID);
+    let (vault, vault_bump) = Pubkey::find_program_address(&[b"vault", user.as_ref()], &crate::ID);
 
     Instruction { 
         program_id: crate::ID, 
         accounts: vec![
             AccountMeta::new(user, true),
-            AccountMeta::new(vault, true),
+            AccountMeta::new(vault, false),
             AccountMeta::new_readonly(system_program(), false),
         ], 
-        data: vec![1]
+        data: vec![1, vault_bump]
     }
 }
 
@@ -56,25 +56,12 @@ fn test_deposit_withdraw_workflow() {
         10, 
     );
 
-    let result = svm.process_instruction(
-        &deposit,
-        &[Account {
-            address: payer,
-            lamports: 10_000_000_000,
-            data: vec![],
-            owner: quasar_svm::system_program::ID,
-            executable: false,
-        }],
-    );
-
-    result.assert_success();
-
     let withdraw = withdraw_instruction(
         Address::from(payer.to_bytes()),
     );
 
-    let result = svm.process_instruction(
-        &withdraw,
+    let result = svm.process_instruction_chain(
+        &[deposit, withdraw],
         &[Account {
             address: payer,
             lamports: 10_000_000_000,
@@ -86,4 +73,3 @@ fn test_deposit_withdraw_workflow() {
 
     result.assert_success();
 }
-
