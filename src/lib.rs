@@ -2,20 +2,27 @@
 
 use quasar_lang::prelude::*;
 
-mod errors;
 mod instructions;
-mod state;
 use instructions::*;
 
-declare_id!("5bjVZNvvEHJCgr3uLSsWXm1naDyZQEC1ikKzZuQDwQWL");
+declare_id!("22222222222222222222222222222222222222222222");
 
 #[program]
 mod performance_vault {
     use super::*;
 
     #[instruction(discriminator = 0)]
-    pub fn initialize(ctx: Ctx<Initialize>) -> Result<(), ProgramError> {
-        ctx.accounts.initialize()
+    pub fn deposit(ctx: Ctx<Deposit>, amount: u64) -> Result<(), ProgramError> {
+        // deposit logic
+        ctx.accounts.deposit(amount);
+        Ok(())
+    }
+
+    #[instruction(discriminator = 1)]
+    pub fn withdraw(ctx: Ctx<Withdraw>) -> Result<(), ProgramError> {
+        // withdraw logic
+        ctx.accounts.withdraw();
+        Ok(())
     }
 }
 

@@ -1,6 +1,7 @@
 use quasar_svm::{Account, Pubkey, QuasarSvm};
 use solana_address::Address;
 use solana_instruction::{AccountMeta, Instruction};
+use solana_system_program::id as system_program; 
 
 fn setup() -> QuasarSvm {
     let elf = std::fs::read("target/deploy/performance_vault.so").unwrap();
@@ -8,30 +9,72 @@ fn setup() -> QuasarSvm {
         .with_program(&Pubkey::from(crate::ID), &elf)
 }
 
-fn initialize_instruction(payer: Address, system_program: Address) -> Instruction {
-    Instruction {
-        program_id: Address::from(crate::ID.to_bytes()),
+fn deposit_instruction (
+    user: Address, 
+    amount: u64
+) -> Instruction {
+
+    let (vault, _) = Pubkey::find_program_address(&[b"vault", user.as_ref()], &crate::ID);
+
+    Instruction { 
+        program_id: crate::ID, 
         accounts: vec![
-            AccountMeta::new(payer, true),
-            AccountMeta::new_readonly(system_program, false),
-        ],
-        data: vec![0],
+            AccountMeta::new(user, true),
+            AccountMeta::new(vault, true),
+            AccountMeta::new_readonly(system_program(), false),
+        ], 
+        data: [vec![0], amount.to_le_bytes().to_vec()].concat()
     }
 }
 
+fn withdraw_instruction (
+    user: Address, 
+) -> Instruction {
+
+    let (vault, _) = Pubkey::find_program_address(&[b"vault", user.as_ref()], &crate::ID);
+
+    Instruction { 
+        program_id: crate::ID, 
+        accounts: vec![
+            AccountMeta::new(user, true),
+            AccountMeta::new(vault, true),
+            AccountMeta::new_readonly(system_program(), false),
+        ], 
+        data: vec![1]
+    }
+}
+
+
 #[test]
-fn test_initialize() {
+fn test_deposit_withdraw_workflow() {
     let mut svm = setup();
 
     let payer = Pubkey::new_unique();
 
-    let instruction = initialize_instruction(
+    let deposit = deposit_instruction(
         Address::from(payer.to_bytes()),
-        Address::from(quasar_svm::system_program::ID.to_bytes()),
+        10, 
     );
 
     let result = svm.process_instruction(
-        &instruction,
+        &deposit,
+        &[Account {
+            address: payer,
+            lamports: 10_000_000_000,
+            data: vec![],
+            owner: quasar_svm::system_program::ID,
+            executable: false,
+        }],
+    );
+
+    result.assert_success();
+
+    let withdraw = withdraw_instruction(
+        Address::from(payer.to_bytes()),
+    );
+
+    let result = svm.process_instruction(
+        &withdraw,
         &[Account {
             address: payer,
             lamports: 10_000_000_000,
@@ -43,3 +86,4 @@ fn test_initialize() {
 
     result.assert_success();
 }
+
